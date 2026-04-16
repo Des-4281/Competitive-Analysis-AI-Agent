@@ -10,8 +10,8 @@ When you enter a company name, the agent kicks off a structured research process
 
 The app has two parts running at the same time:
 
-- **MCP Server** — a local HTTP server that exposes a set of custom research tools (validate, sector detection, competitor search, web browsing, report generation). It starts in a background thread when you run the app.
-- **AI Agent** — a `smolagents` `ToolCallingAgent` powered by GPT-4o-mini. It connects to the MCP server and decides which tools to call, in what order, based on what it has learned so far.
+- **MCP Server** - a local HTTP server that exposes a set of custom research tools (validate, sector detection, competitor search, web browsing, report generation). It starts in a background thread when you run the app.
+- **AI Agent** - a `smolagents` `ToolCallingAgent` powered by GPT-4o-mini. It connects to the MCP server and decides which tools to call, in what order, based on what it has learned so far.
 
 The agent reasons through the task step by step, calling tools as needed, similar to how a human analyst would work through a problem rather than doing everything at once.
 
@@ -76,11 +76,20 @@ API base URL. Defaults to `https://api.openai.com/v1`. Override in `config.json`
 
 ## Tech Stack
 
-- [smolagents](https://github.com/huggingface/smolagents) — agent framework
-- [FastMCP](https://github.com/jlowin/fastmcp) — MCP server for custom tools
-- [DuckDuckGo Search](https://pypi.org/project/duckduckgo-search/) — web search
-- [BeautifulSoup4](https://pypi.org/project/beautifulsoup4/) — webpage scraping
-- OpenAI GPT-4o-mini — language model
+- [smolagents](https://github.com/huggingface/smolagents) - agent framework
+- [FastMCP](https://github.com/jlowin/fastmcp) - MCP server for custom tools
+- [DuckDuckGo Search](https://pypi.org/project/duckduckgo-search/) - web search
+- [BeautifulSoup4](https://pypi.org/project/beautifulsoup4/) - webpage scraping
+- OpenAI GPT-4o-mini - language model
+
+## Known Limitations
+
+- **DuckDuckGo rate limits** - searches can fail or return poor results if too many requests are made too quickly
+- **Sector detection isn't always accurate** - relies on keyword matching, so niche or lesser-known companies may be misclassified or return "Unknown sector"
+- **Competitor list is shallow** - pulls from a hardcoded list of known companies per sector, so smaller or emerging competitors won't appear
+- **Web scraping can fail** - the `browse_page` tool depends on target sites not blocking scrapers; many will return no content
+- **Report placeholders may not fill in** - the comparison table falls back to generic "Competitor A/B/C" if not enough competitor data is found
+- **Requires OpenAI** - hardcoded to GPT-4o-mini, no support for other model providers out of the box
 
 ## License
 
