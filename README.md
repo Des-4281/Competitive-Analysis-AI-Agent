@@ -4,14 +4,28 @@ An AI-powered agent that performs automated competitive analysis for any company
 
 ## How It Works
 
-The agent uses a local MCP (Model Context Protocol) server to expose custom tools, which are consumed by a `smolagents` `ToolCallingAgent` backed by GPT-4o-mini.
+When you enter a company name, the agent kicks off a structured research process. It doesn't just search once and guess. It breaks the problem into steps, uses the right tool for each one, and builds up context before writing the final report.
 
-**Analysis pipeline:**
-1. Validate the input company is real
-2. Identify its primary industry sector
-3. Find top 3 competitors
-4. Browse competitor pages and gather strategy data
-5. Generate a formatted report with comparison table and insights
+### Architecture
+
+The app has two parts running at the same time:
+
+- **MCP Server** — a local HTTP server that exposes a set of custom research tools (validate, sector detection, competitor search, web browsing, report generation). It starts in a background thread when you run the app.
+- **AI Agent** — a `smolagents` `ToolCallingAgent` powered by GPT-4o-mini. It connects to the MCP server and decides which tools to call, in what order, based on what it has learned so far.
+
+The agent reasons through the task step by step, calling tools as needed, similar to how a human analyst would work through a problem rather than doing everything at once.
+
+### What the Agent Does and Why
+
+1. **Validate the company** - before doing any research, it confirms the input is a real company and not a typo or ambiguous term. No point analyzing something that doesn't exist.
+
+2. **Identify the sector** - it searches multiple sources (web, Wikipedia, news) and cross-references them to determine the primary industry. This is important because "competitors" means something different in tech vs. healthcare vs. retail.
+
+3. **Find the top 3 competitors** - using the sector as context, it searches for the leading players in that space and ranks them by how often they appear across multiple queries. It deliberately excludes the input company from this list.
+
+4. **Gather strategy data** - it browses competitor pages and pulls real-time information like pricing, product offerings, press releases, and news. This is where the `browse_page` tool comes in, scraping and extracting only the content relevant to competitive strategy.
+
+5. **Generate the report** - once it has enough context, it calls the `generate_report` tool to produce a structured Markdown report with an executive summary, a competitor comparison table, and actionable insights tailored to the input company.
 
 ## Setup
 
