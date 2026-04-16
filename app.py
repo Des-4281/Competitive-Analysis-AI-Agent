@@ -161,12 +161,16 @@ def extract_competitors_advanced(search_results: str, exclude_company: str, sect
     competitors = []
 
     sector_companies = {
-        "technology": ["microsoft", "apple", "amazon", "meta", "google", "ibm", "oracle", "intel"],
-        "finance": ["jpmorgan", "bank of america", "goldman sachs", "morgan stanley", "citi", "wells fargo"],
-        "healthcare": ["johnson & johnson", "pfizer", "merck", "novartis", "roche", "abbvie"],
-        "education": ["great learning", "coursera", "udemy", "edx", "khan academy", "byju's", "pluralsight"],
-        "retail": ["walmart", "target", "amazon", "home depot", "costco", "best buy"],
-        "automotive": ["toyota", "ford", "general motors", "honda", "bmw", "mercedes-benz"],
+        "technology": ["microsoft", "apple", "amazon", "meta", "google", "ibm", "oracle", "intel", "salesforce", "adobe", "sap", "nvidia", "cisco", "dell", "hp", "servicenow", "workday", "snowflake", "palantir", "twilio"],
+        "finance": ["jpmorgan", "bank of america", "goldman sachs", "morgan stanley", "citi", "wells fargo", "blackrock", "charles schwab", "american express", "visa", "mastercard", "paypal", "stripe", "square", "fidelity"],
+        "healthcare": ["johnson & johnson", "pfizer", "merck", "novartis", "roche", "abbvie", "unitedhealth", "cvs health", "cigna", "anthem", "humana", "medtronic", "abbott", "boston scientific", "becton dickinson"],
+        "education": ["great learning", "coursera", "udemy", "edx", "khan academy", "byju's", "pluralsight", "chegg", "duolingo", "skillshare", "linkedin learning", "2u", "pearson", "mcgraw hill"],
+        "retail": ["walmart", "target", "amazon", "home depot", "costco", "best buy", "kroger", "walgreens", "cvs", "lowe's", "ebay", "etsy", "shopify", "wayfair", "dollar general"],
+        "automotive": ["toyota", "ford", "general motors", "honda", "bmw", "mercedes-benz", "tesla", "volkswagen", "stellantis", "hyundai", "kia", "nissan", "rivian", "lucid", "subaru"],
+        "manufacturing": ["ge", "siemens", "honeywell", "3m", "caterpillar", "deere", "emerson", "parker hannifin", "illinois tool works", "rockwell automation"],
+        "energy": ["exxonmobil", "chevron", "shell", "bp", "totalenergies", "conocophillips", "nextera energy", "duke energy", "dominion energy", "enphase", "first solar"],
+        "media": ["netflix", "disney", "warner bros", "comcast", "paramount", "sony", "nbc universal", "fox", "spotify", "apple tv"],
+        "telecommunications": ["at&t", "verizon", "t-mobile", "comcast", "charter", "dish", "lumen", "frontier", "windstream"],
     }
 
     if sector_lower in sector_companies:
@@ -342,22 +346,41 @@ def identify_sector(company_name: str) -> str:
 @mcp.tool()
 def identify_competitors(sector: str, company_name: str) -> str:
     try:
-        competitor_candidates = []
+        peer_candidates = []
+        industry_leaders = []
 
-        results1 = web_search_tool(f"top {sector} companies competitors market share")
-        competitor_candidates.extend(extract_competitors_advanced(results1, company_name, sector))
+        # Find companies at a similar size and stage
+        results1 = web_search_tool(f"{company_name} competitors similar size {sector} market")
+        peer_candidates.extend(extract_competitors_advanced(results1, company_name, sector))
         time.sleep(1)
 
         results2 = web_search_tool(f"who are {company_name} main competitors in {sector}")
-        competitor_candidates.extend(extract_competitors_advanced(results2, company_name, sector))
+        peer_candidates.extend(extract_competitors_advanced(results2, company_name, sector))
         time.sleep(1)
 
-        results3 = web_search_tool(f"{sector} industry key players leading companies")
-        competitor_candidates.extend(extract_competitors_advanced(results3, company_name, sector))
+        results3 = web_search_tool(f"{company_name} vs competitors comparison {sector}")
+        peer_candidates.extend(extract_competitors_advanced(results3, company_name, sector))
+        time.sleep(1)
 
-        final_competitors = rank_competitors(competitor_candidates, company_name)
-        if final_competitors:
-            return ", ".join(final_competitors[:3])
+        # Find top industry leaders to benchmark against
+        results4 = web_search_tool(f"top {sector} companies market share leaders 2024")
+        industry_leaders.extend(extract_competitors_advanced(results4, company_name, sector))
+        time.sleep(1)
+
+        results5 = web_search_tool(f"best {sector} companies ranked revenue growth")
+        industry_leaders.extend(extract_competitors_advanced(results5, company_name, sector))
+
+        # Prioritize peers, then fill with industry leaders
+        ranked_peers = rank_competitors(peer_candidates, company_name)
+        ranked_leaders = rank_competitors(industry_leaders, company_name)
+
+        combined = ranked_peers[:2]
+        for leader in ranked_leaders:
+            if leader not in combined and len(combined) < 3:
+                combined.append(leader)
+
+        if combined:
+            return ", ".join(combined)
         return "No competitors identified"
     except Exception as e:
         return f"Error identifying competitors: {e}"
@@ -406,6 +429,26 @@ Analysis of {company_name}'s competitive position based on available market data
 |------------|---------------|-------------|-----------|------------|
 {competitor_rows}
 
+## SWOT Analysis: {company_name}
+
+**Strengths**
+- -
+
+**Weaknesses**
+- -
+
+**Opportunities**
+- -
+
+**Threats**
+- -
+
+## Closing the Gap: How {company_name} Can Gain Market Share
+- Identify where top competitors are winning and what {company_name} can replicate or improve on
+- Target underserved customer segments that industry leaders are ignoring
+- Invest in the product or service areas where competitors are receiving the most criticism
+- Use pricing, partnerships, or distribution advantages to compete where outright dominance isn't possible
+
 ## Actionable Insights for {company_name}
 - Develop differentiated positioning in the market
 - Focus on unique value propositions
@@ -429,6 +472,8 @@ Given a single company name, do the following:
 - Identify its top three competitors, excluding the company itself.
 - Gather real-time strategy data such as pricing, marketing, product offerings, quarterly earnings, press releases, and authentic news coverage using available tools.
 - Compare the company with its top competitors and generate a formatted report with actionable insights.
+- Include a SWOT analysis for the input company based on the research gathered.
+- Identify where the input company sits relative to its peers and the top industry leaders, and suggest specific ways it can close the market share gap.
 
 Focus only on the provided company and its top three competitors.
 """
@@ -471,6 +516,8 @@ prepare a well-formatted report with a comparison table and actionable insights.
 Provide a Markdown report for the input company with sections:
 - Executive Summary
 - Comparison Table
+- SWOT Analysis
+- Closing the Gap (how the company can gain market share vs peers and industry leaders)
 - Actionable Insights
 """,
 )
