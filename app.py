@@ -1,5 +1,4 @@
 # app.py
-import json
 import os
 import re
 import threading
@@ -23,11 +22,9 @@ from smolagents import (
 # -----------------------------
 # Config
 # -----------------------------
-with open("config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
-
-os.environ["OPENAI_API_KEY"] = config["API_KEY"]
-os.environ["OPENAI_BASE_URL"] = config["OPENAI_API_BASE"]
+api_key = os.environ.get("OPENAI_API_KEY") or input("Enter your OpenAI API key: ").strip()
+os.environ["OPENAI_API_KEY"] = api_key
+os.environ["OPENAI_BASE_URL"] = "https://api.openai.com/v1"
 
 MODEL_ID = "gpt-4o-mini"
 MCP_HOST = "127.0.0.1"
