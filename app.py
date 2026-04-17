@@ -689,9 +689,9 @@ def run_analysis(company_name: str) -> str:
 
 
 if __name__ == "__main__":
-    company = input("Enter a company name: ").strip()
+    company = os.environ.get("COMPANY_NAME") or input("Enter a company name: ").strip()
     if not company:
-        raise ValueError("Please enter a company name.")
+        raise ValueError("Please enter a company name. Set the COMPANY_NAME environment variable.")
 
     output = run_analysis(company)
     print("\n" + output + "\n")
