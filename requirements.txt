@@ -3,3 +3,4 @@ smolagents[mcp,toolkit]==1.21.2
 mcp[cli]==1.27.0
 requests
 beautifulsoup4
+pytrends

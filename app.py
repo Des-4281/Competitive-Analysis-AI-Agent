@@ -7,6 +7,7 @@ from collections import Counter
 
 import requests
 from bs4 import BeautifulSoup
+from pytrends.request import TrendReq
 from mcp.server.fastmcp import FastMCP
 from smolagents import (
     DuckDuckGoSearchTool,
@@ -26,7 +27,7 @@ api_key = os.environ.get("OPENAI_API_KEY") or input("Enter your OpenAI API key: 
 os.environ["OPENAI_API_KEY"] = api_key
 os.environ["OPENAI_BASE_URL"] = "https://api.openai.com/v1"
 
-MODEL_ID = "gpt-4o-mini"
+MODEL_ID = "gpt-4.1"
 MCP_HOST = "127.0.0.1"
 MCP_PORT = 8000
 MCP_URL = f"http://{MCP_HOST}:{MCP_PORT}/mcp"
@@ -276,6 +277,49 @@ def extract_relevant_content(content: str, instructions: str) -> str:
     return ". ".join(relevant_sentences[:10])
 
 
+def fetch_google_trends(companies: list[str]) -> dict[str, int]:
+    try:
+        pytrends = TrendReq(hl="en-US", tz=360)
+        keywords = companies[:5]
+        pytrends.build_payload(keywords, timeframe="today 12-m")
+        data = pytrends.interest_over_time()
+        if data.empty:
+            return {}
+        averages = data.drop(columns=["isPartial"], errors="ignore").mean().to_dict()
+        return {k: round(v) for k, v in averages.items()}
+    except Exception:
+        return {}
+
+
+def fetch_wikipedia_data(company_name: str) -> dict[str, str]:
+    try:
+        search_name = company_name.replace(" ", "_")
+        url = f"https://en.wikipedia.org/wiki/{search_name}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            return {}
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        infobox = soup.find("table", {"class": "infobox"})
+        if not infobox:
+            return {}
+
+        data = {}
+        for row in infobox.find_all("tr"):
+            header = row.find("th")
+            value = row.find("td")
+            if header and value:
+                key = header.get_text(strip=True).lower()
+                val = value.get_text(strip=True)
+                if any(k in key for k in ["revenue", "employees", "founded", "headquarters"]):
+                    data[key] = val[:100]
+
+        return data
+    except Exception:
+        return {}
+
+
 def extract_competitors_from_context(context: str) -> list[str]:
     competitors = []
 
@@ -403,59 +447,143 @@ def browse_page(url: str, instructions: str) -> str:
 
 
 @mcp.tool()
-def generate_report(company_name: str, context: str) -> str:
-    competitors = extract_competitors_from_context(context)
+def gather_market_data(company_name: str, competitors: str) -> str:
+    try:
+        all_companies = [company_name] + [c.strip() for c in competitors.split(",") if c.strip()]
 
-    competitor_rows = ""
-    for competitor in competitors[:3]:
-        competitor_rows += f"| {competitor} | - | - | - | - |\n"
+        trends = fetch_google_trends(all_companies)
+        wiki_data = fetch_wikipedia_data(company_name)
 
-    if not competitor_rows:
-        competitor_rows = (
-            "| Competitor A | - | - | - | - |\n"
-            "| Competitor B | - | - | - | - |\n"
-            "| Competitor C | - | - | - | - |\n"
-        )
+        output = f"## Market Data for {company_name}\n\n"
 
-    report = f"""
-# Competitive Analysis Report: {company_name}
+        if wiki_data:
+            output += "### Company Profile (Wikipedia)\n"
+            for key, val in wiki_data.items():
+                output += f"- **{key.title()}:** {val}\n"
+            output += "\n"
+
+        if trends:
+            output += "### Google Trends - 12-Month Search Interest (0-100)\n"
+            sorted_trends = sorted(trends.items(), key=lambda x: x[1], reverse=True)
+            for company, score in sorted_trends:
+                gap = trends.get(company_name, 0) - score
+                gap_str = f"(gap: {gap:+d})" if company != company_name else "(input company)"
+                output += f"- **{company}:** {score} {gap_str}\n"
+            output += "\n"
+
+            if company_name in trends:
+                leaders_above = [(c, s) for c, s in sorted_trends if s > trends[company_name]]
+                if leaders_above:
+                    output += "### Gap Analysis\n"
+                    for competitor, score in leaders_above:
+                        diff = score - trends[company_name]
+                        output += f"- {company_name} trails **{competitor}** by {diff} points in search interest — indicates lower brand visibility or market awareness\n"
+
+        return output if output.strip() else "No market data available"
+    except Exception as e:
+        return f"Error gathering market data: {e}"
+
+
+@mcp.tool()
+def gather_editorial_insights(company_name: str, competitors: str) -> str:
+    try:
+        comp_list = [c.strip() for c in competitors.split(",") if c.strip()]
+        insights = []
+
+        results1 = web_search_tool(f"{company_name} growth strategy why successful 2024 analysis")
+        insights.append(f"### {company_name} - Growth & Strategy\n{results1}")
+        time.sleep(1)
+
+        results2 = web_search_tool(f"{company_name} challenges declining losing customers problems")
+        insights.append(f"### {company_name} - Challenges & Weaknesses\n{results2}")
+        time.sleep(1)
+
+        for competitor in comp_list[:3]:
+            results = web_search_tool(f"why is {competitor} beating {company_name} competitive advantage winning")
+            insights.append(f"### {competitor} - Why They Are Winning\n{results}")
+            time.sleep(1)
+
+        if comp_list:
+            all_names = " vs ".join([company_name] + comp_list[:2])
+            results = web_search_tool(f"{all_names} who is winning market share comparison editorial")
+            insights.append(f"### Direct Comparison - Editorial Coverage\n{results}")
+
+        return "\n\n".join(insights) if insights else "No editorial insights found"
+    except Exception as e:
+        return f"Error gathering editorial insights: {e}"
+
+
+@mcp.tool()
+def generate_report(
+    company_name: str,
+    sector: str,
+    competitors: str,
+    market_data: str,
+    editorial_insights: str,
+    swot_strengths: str,
+    swot_weaknesses: str,
+    swot_opportunities: str,
+    swot_threats: str,
+    competitor_comparison: str,
+    executive_summary: str,
+) -> str:
+    """
+    Assemble the final competitive analysis report from pre-synthesized research.
+    All parameters must be filled with actual findings — do not pass placeholder text.
+
+    competitor_comparison must be formatted as markdown sections, one per competitor, like:
+    ### Competitor Name
+    - **Strategy:** ...
+    - **Key Tactics:** ...
+    - **Strengths:** ...
+    - **Weaknesses:** ...
+    Do not use a markdown table.
+    """
+    report = f"""# Competitive Analysis Report: {company_name}
 
 ## Executive Summary
-Analysis of {company_name}'s competitive position based on available market data.
+{executive_summary}
+
+## Sector
+{sector}
+
+## Identified Competitors
+{competitors}
+
+## Market Data
+{market_data}
 
 ## Competitor Comparison
 
-| Competitor | Strategy Type | Key Tactics | Strengths | Weaknesses |
-|------------|---------------|-------------|-----------|------------|
-{competitor_rows}
+{competitor_comparison}
 
 ## SWOT Analysis: {company_name}
 
 **Strengths**
-- -
+{swot_strengths}
 
 **Weaknesses**
-- -
+{swot_weaknesses}
 
 **Opportunities**
-- -
+{swot_opportunities}
 
 **Threats**
-- -
+{swot_threats}
+
+## What Competitors Are Doing Better (and Why)
+{editorial_insights}
 
 ## Closing the Gap: How {company_name} Can Gain Market Share
-- Identify where top competitors are winning and what {company_name} can replicate or improve on
-- Target underserved customer segments that industry leaders are ignoring
-- Invest in the product or service areas where competitors are receiving the most criticism
-- Use pricing, partnerships, or distribution advantages to compete where outright dominance isn't possible
+- Target customer segments where top competitors receive the most criticism
+- Match or undercut competitor pricing in areas where {company_name} has cost advantages
+- Accelerate investment in product capabilities where competitors are weakest
+- Pursue partnerships or distribution channels competitors have not yet exploited
 
 ## Actionable Insights for {company_name}
-- Develop differentiated positioning in the market
-- Focus on unique value propositions
-- Optimize operational efficiencies
-- Enhance customer engagement strategies
-
-*Report generated from context data. Fill in specific details based on comprehensive market research.*
+- Prioritize the opportunities identified in the SWOT analysis above
+- Use Google Trends gap data to guide brand visibility investments
+- Monitor competitor moves in areas highlighted by editorial coverage
 """
     return report.strip()
 
@@ -466,16 +594,17 @@ Analysis of {company_name}'s competitive position based on available market data
 system_prompt = """
 You are an expert Competitive Analysis Agent.
 
-Given a single company name, do the following:
-- Validate that it is a real company.
-- Determine its primary industry sector.
-- Identify its top three competitors, excluding the company itself.
-- Gather real-time strategy data such as pricing, marketing, product offerings, quarterly earnings, press releases, and authentic news coverage using available tools.
-- Compare the company with its top competitors and generate a formatted report with actionable insights.
-- Include a SWOT analysis for the input company based on the research gathered.
-- Identify where the input company sits relative to its peers and the top industry leaders, and suggest specific ways it can close the market share gap.
+Given a single company name, produce a comprehensive competitive analysis by:
+- Validating that it is a real company
+- Determining its primary industry sector
+- Identifying its top three competitors
+- Gathering real market data including Google Trends scores, Wikipedia profile data, quarterly earnings, and press releases
+- Finding editorial and news coverage explaining why competitors are winning or losing
+- Synthesizing a full SWOT analysis for the input company grounded in the research — every point must reference specific evidence from the data gathered
+- Building a competitor comparison table covering strategy, key tactics, strengths, and weaknesses
+- Calling generate_report with all synthesized findings populated — every field must contain real research, not placeholder text or dashes
 
-Focus only on the provided company and its top three competitors.
+Your final answer must be the output of generate_report: one cohesive, well-structured report. Do not output intermediate research steps as the final answer.
 """
 
 planning_prompts = PlanningPromptTemplate(
@@ -488,9 +617,11 @@ Step-by-step plan:
 1. Validate the company name.
 2. Determine the sector.
 3. Identify the top 3 competitors.
-4. Gather strategy data on the company and those competitors.
-5. Analyze strategies and generate a comparison table.
-6. Propose actionable insights.
+4. Gather real market data including search trends and company profile information.
+5. Gather strategy data on the company and those competitors.
+6. Search for editorial and news coverage explaining why competitors are winning or losing relative to the input company.
+7. Analyze all findings and generate a structured comparison report.
+8. Propose actionable insights backed by the research.
 """,
     update_facts_pre_messages="Reassess facts with new information, focusing on the input company and its competitors:",
     update_facts_post_messages="Updated facts considered for the single-company analysis.",
@@ -517,6 +648,7 @@ Provide a Markdown report for the input company with sections:
 - Executive Summary
 - Comparison Table
 - SWOT Analysis
+- What Competitors Are Doing Better (backed by editorial sources, not assumptions)
 - Closing the Gap (how the company can gain market share vs peers and industry leaders)
 - Actionable Insights
 """,
