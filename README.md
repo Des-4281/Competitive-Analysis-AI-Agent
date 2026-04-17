@@ -176,8 +176,6 @@ API base URL. Defaults to `https://api.openai.com/v1`. Override to use a compati
 ## Known Limitations
 
 - **DuckDuckGo rate limits** - searches can fail or return poor results if too many requests are made too quickly
-- **Sector detection isn't always accurate** - relies on keyword matching, so niche or lesser-known companies may be misclassified or return "Unknown sector"
-- **Competitor list is shallow** - pulls from a hardcoded list of known companies per sector, so smaller or emerging competitors won't appear
 - **Web scraping can fail** - the `browse_page` tool depends on target sites not blocking scrapers; many will return no content
 - **Google Trends comparisons against consumer giants are not meaningful** - a niche B2B SaaS product will always score near 0 vs. Apple or Microsoft; the gap analysis is most useful when comparing against direct competitors
 
