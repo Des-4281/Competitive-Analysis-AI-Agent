@@ -21,12 +21,11 @@ steps:
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'run'
-      - 'deploy'
+      - 'jobs'
+      - 'update'
       - 'competitive-analysis-agent'
       - '--image=gcr.io/$PROJECT_ID/competitive-analysis-agent:latest'
       - '--region=us-central1'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
       - '--set-env-vars=OPENAI_BASE_URL=https://api.openai.com/v1'
 
 images:

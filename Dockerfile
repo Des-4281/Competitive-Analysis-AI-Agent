@@ -11,8 +11,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8000
-
 ENV OPENAI_API_KEY=""
 ENV OPENAI_BASE_URL="https://api.openai.com/v1"
 ENV COMPANY_NAME=""
