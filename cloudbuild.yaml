@@ -22,7 +22,7 @@ steps:
     args:
       - 'run'
       - 'jobs'
-      - 'update'
+      - 'create'
       - 'competitive-analysis-agent'
       - '--image=gcr.io/$PROJECT_ID/competitive-analysis-agent:latest'
       - '--region=us-central1'
