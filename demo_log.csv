@@ -1,3 +1,17 @@
+GCP Run Provenance,,
+Field,Value,
+GCP Project,competitive-analysis-ai-agent,
+Job Name,competitive-analysis-agent,
+Execution ID,competitive-analysis-agent-q8ndg,
+Region,us-central1,
+Task Index,0,
+Exit Code,0 (Success),
+Run Started,2026-04-17T22:35:25Z,
+Run Completed,2026-04-17T22:36:46Z,
+Duration,~81 seconds,
+Log Source,projects/competitive-analysis-ai-agent/logs/run.googleapis.com%2Fstdout,
+Executed By,delosolorio@gmail.com,
+
 Run Timestamp,2026-04-17 18:36:44 UTC (Cloud Run Job: competitive-analysis-agent-q8ndg)
 Company,Miro
 Sector,Technology / Digital Collaboration & Whiteboarding
